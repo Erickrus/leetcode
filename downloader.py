@@ -6,6 +6,7 @@ import time
 import datetime
 import re
 import threading
+import urllib.parse
 import urllib.request
 
 class DownloaderThread(threading.Thread):
@@ -47,12 +48,14 @@ class Downloader:
 
         i = 0
         for line in self.lines:
-            if i>10:
-                break
+            #if i>10:
+            #    break
             if line.endswith("ts"):
                 threadId = i % self.nThread
-                print(datetime.datetime.now(), threadId, "added url: ", self.baseUrl+line)
-                urlLists[threadId].append(self.baseUrl+line)
+                targetUrl = urllib.parse.urljoin(self.baseUrl, line)
+
+                print(datetime.datetime.now(), threadId, "added url: ", targetUrl)
+                urlLists[threadId].append(targetUrl)
                 i += 1
 
         for i in range(self.nThread):
@@ -64,13 +67,13 @@ class Downloader:
             threads[i].join()
 
         print(datetime.datetime.now(), "merge ts files")
+        targetFilename = os.path.abspath(".") + ".ts"
         for line in self.lines:
-            if line.endswith("ts") and os.path.exists(line):
-                print(datetime.datetime.now(), "cat %s >> all.ts" % line)
-                os.system("cat %s >> all.ts" % line)
+            if line.endswith("ts") and os.path.exists(os.path.basename(line)):
+                print(datetime.datetime.now(), "cat %s >> %s" % (os.path.basename(line), targetFilename))
+                os.system("cat %s >> %s" % (os.path.basename(line), targetFilename))
 
 
 if __name__ == "__main__":
     m3u8 = sys.argv[1]
     Downloader(m3u8, nThread=10).download()
-
