@@ -4,7 +4,72 @@
 
 # questions, uncertain stuffs
 # 1. How Nx is used for encoder and decoder stack
-# 2. energy == score ?
+# 2. Why transformer block takes the same x as k q v
+
+
+# Some Basics
+# torch.nn building blocks
+# https://pytorch.org/docs/stable/nn.html
+#  Containers: Module, ModuleList, Sequential
+#  Convolution Layers: Conv2d
+#  Pooling Layers: MaxPool2d
+#  Activations: ReLU
+#  Normalization Layers: LayerNorm
+#  Linear Layer: Linear
+#  Dropout Layers: Dropout
+#  Sparse Layers: Embedding
+
+# https://pytorch.org/docs/stable/torch.html
+#  Tensors:
+#    numel()
+#  Creation Ops:
+#    tensor(), arange(), randn(), ones(), zeros(), from_numpy()
+#  Indexing, Slicing, Joining, Mutating Ops:
+#    cat(), squeeze(), unsqueeze(), transpose(), stack()
+#  BLAS and LAPACK Operations:
+#    mm(), bmm(), matmul()
+#  Other Operations:
+#    tril(), triu(), einsum()
+# torch.sparse.softmax()
+
+
+#torch.Tensor
+#  descriptors
+#    shape, numel(), size(), type(), dim()
+#  shaping
+#    reshape(), squeeze(), unsqueeze(), transpose(), select(), expand(), permute()
+#  conversion
+#    to(), numpy()
+#  stats
+#    sum()
+#  misc
+#    masked_fill()
+
+#pil conversions
+#  torchvision.transforms.functional
+#    to_pil_image(), to_tensor()
+
+
+# Class dependencies
+#
+#               Transformer
+#                 @Encoder, @Decoder
+#                  /            \
+# Encoder         /          Decoder
+#   @TransformerBlock x N      @DecoderBlock x N
+#   Embedding, Dropout         Embedding, Linear, Dropout
+#         |                      |
+#         |                  DecoderBlock
+#         |                 /  @SelfAttention, @TransformerBlock
+#         |         /------/   LayerNorm, dropout
+#         |        /                    |
+# TransformerBlock                      |
+#   @SelfAttention                      |
+#   LayerNorm, Linear, Dropout, ReLU   /
+#                      \              /
+#                       \            /
+#                       SelfAttention
+#                         Linear
 
 import torch
 import torch.nn as nn
