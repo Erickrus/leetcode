@@ -157,6 +157,10 @@ class TransformerBlock(nn.Module):
   def __init__(self, embed_size, heads, dropout, forward_expansion):
     super(TransformerBlock, self).__init__()
     self.attention = SelfAttention(embed_size, heads)
+    # https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html
+    # https://arxiv.org/pdf/1607.06450.pdf
+    # $ y = \frac{x-E[x]}{\sqrt{Var[x]+\epsilon }} * \gamma + \beta $
+
     self.norm1 = nn.LayerNorm(embed_size)
     self.norm2 = nn.LayerNorm(embed_size)
 
@@ -210,7 +214,25 @@ class Encoder(nn.Module):
 
   def forward(self, x, mask):
     N, seq_length = x.shape
+    # here, just a naive implementation for position embedding
+    # create [0, ... , seq_length] x N, then look up in the self.position_embedding
+    # https://pytorch.org/docs/stable/generated/torch.nn.Embedding.html
+    # As the position_embedding.weight requires_grad == True (by default)
+    # it will be updated along with the training process
     positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
+
+    # in original paper, using $PE_{(pos, 2i+1)} = cos(pos/10000^(2i/d_model))$
+    # https://towardsdatascience.com/how-to-code-the-transformer-in-pytorch-24db27c8f9ec
+    # pe = torch.zeros(max_seq_len, d_model)
+    # for pos in range(max_seq_len):
+    #   for i in range(0, d_model, 2):
+    #     pe[pos, i] = math.sin(pos / (10000 ** ((2 * i)/d_model)))
+    #     pe[pos, i + 1] = math.cos(pos / (10000 ** ((2 * (i + 1))/d_model)))
+    # pe = pe.unsqueeze(0)
+
+    # in forward(), actually, make embeddings relatively larger
+    # x = x * math.sqrt(self.d_model)
+
 
     out = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
     for layer in self.layers:
