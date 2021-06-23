@@ -4,8 +4,9 @@
 
 # questions, uncertain stuffs
 # 1. Why transformer block takes the same x as k q v
-# 2. Why tgt_mask is different from src_mask
-
+# 2. Why tgt_mask has different shape from src_mask
+# 3. What's the shape of each tensor in each stage (Tensor shape analysis)
+# 4. is it the same logic to implement tgt_pad_idx logic, as it is not implemented
 
 # Some Basics
 # torch.nn building blocks
@@ -358,6 +359,16 @@ class Transformer(nn.Module):
         N, 1, tgt_len, tgt_len
     )
     # (N, 1, tgt_len, tgt_len)
+
+
+    # Transformer in 5 minutes (Blue Season)
+    # https://blue-season.github.io/transformer-in-5-minutes/
+    # target mask is also called "Look-ahead Mask"
+    # To ensure causality, a mask is used to prevent the future leaks into the past
+    # Following image explains how it works, so basically it is a lower triangular matrix structure
+    # up/right is the future index direction
+    # https://blue-season.github.io/images/2019-09-08/causal-mask.png
+
     return tgt_mask.to(self.device)
 
   def forward(self, src, tgt):
