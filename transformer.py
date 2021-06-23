@@ -3,8 +3,8 @@
 
 
 # questions, uncertain stuffs
-# 1. How Nx is used for encoder and decoder stack
-# 2. Why transformer block takes the same x as k q v
+# 1. Why transformer block takes the same x as k q v
+# 2. Why tgt_mask is different from src_mask
 
 
 # Some Basics
@@ -160,6 +160,11 @@ class TransformerBlock(nn.Module):
     # https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html
     # https://arxiv.org/pdf/1607.06450.pdf
     # $ y = \frac{x-E[x]}{\sqrt{Var[x]+\epsilon }} * \gamma + \beta $
+    # Normalization Techniques in Deep Neural Networks (Aakash Bindal)
+    # https://medium.com/techspace-usict/normalization-techniques-in-deep-neural-networks-9121bf100d8
+    # 
+    # refers to an image of summary of all normalization techniques
+    # https://miro.medium.com/max/3000/1*r0HM4TvZvvceXcJIpDJmDQ.png
 
     self.norm1 = nn.LayerNorm(embed_size)
     self.norm2 = nn.LayerNorm(embed_size)
@@ -233,7 +238,6 @@ class Encoder(nn.Module):
     # in forward(), actually, make embeddings relatively larger
     # x = x * math.sqrt(self.d_model)
 
-
     out = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
     for layer in self.layers:
       out = layer(out, out, out, mask)
@@ -288,7 +292,7 @@ class Decoder(nn.Module):
     self.fc_out = nn.Linear(embed_size, tgt_vocab_size)
     self.dropout = nn.Dropout(dropout)
     
-  def forward(self, x, enc_out,src_mask, tgt_mask):
+  def forward(self, x, enc_out, src_mask, tgt_mask):
     N, seq_length = x.shape
     positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
     x = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
@@ -337,7 +341,7 @@ class Transformer(nn.Module):
     )
 
     self.src_pad_idx = src_pad_idx
-    self.tgt_pad_idx = tgt_pad_idx
+    self.tgt_pad_idx = tgt_pad_idx # this is never used ... 
     self.device = device
 
   def make_src_mask(self, src):
@@ -347,6 +351,9 @@ class Transformer(nn.Module):
 
   def make_tgt_mask(self, tgt):
     N, tgt_len = tgt.shape
+    # lower triangular
+    # https://pytorch.org/docs/stable/generated/torch.tril.html
+    # [tgt_len, tgt_len] => expand => [N, 1, tgt_len, tgt_len]
     tgt_mask = torch.tril(torch.ones((tgt_len, tgt_len))).expand(
         N, 1, tgt_len, tgt_len
     )
