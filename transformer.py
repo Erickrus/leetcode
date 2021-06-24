@@ -99,6 +99,10 @@ class SelfAttention(nn.Module):
     N = queries.shape[0] # How many example to send in the same time
     value_len, key_len, query_len = values.shape[1],  keys.shape[1], queries.shape[1]
 
+    # values, keys: [N, src_len, embed_size]
+    # queries: [N, src_len/tgt_len, embed_size]
+    # mask: [N, 1, 1, src_len] or [N, 1, tgt_len, tgt_len]
+
     # Split embedding into self.heads pieces
     values = values.reshape(N, value_len, self.heads, self.head_dim)
     keys = keys.reshape(N, key_len, self.heads, self.head_dim)
@@ -117,12 +121,16 @@ class SelfAttention(nn.Module):
     values = self.values(values)
     keys = self.keys(keys)
     queries = self.queries(queries)
-    
+    # values, keys: [N, src_len, heads, head_dim]
+    # queries: [N, src_len/tgt_len, heads, head_dim]
+
+    # notice in following matrix multiply(bmm)
+    # shape of q != shape of v/k (not necessarily)
 
     # 此处energy就是公式里的 $QK^T$
     # energy calculation
-    # queries shape: (N, query_len, heads, heads_dim)
-    # keys shape: (N, query_len, heads, heads_dim)
+    # queries shape: (N, query_len, heads, head_dim)
+    # keys shape: (N, query_len, heads, head_dim)
     # energy shape: (N, heads, query_len, key_len)
     energy = torch.einsum("nqhd,nkhd->nhqk", [queries, keys])
 
@@ -147,7 +155,7 @@ class SelfAttention(nn.Module):
       N, query_len, self.heads*self.head_dim
     )
     # attention shape: (N, heads, query_len, key_len)
-    # values shape: (N, value_len, heads, heads_dim)
+    # values shape: (N, value_len, heads, head_dim)
     # (N, query_len, heads, head_dim)
     # after einsum, then flattern last 2 dim
 
@@ -181,11 +189,17 @@ class TransformerBlock(nn.Module):
     self.dropout = nn.Dropout(dropout)
 
   def forward(self, value, key, query, mask):
+    # value, key: [N, src_len, embed_size]
+    # query: [N, src_len/tgt_len, embed_size]
+    # mask: [N, 1, 1, src_len]
     attention = self.attention(value, key, query, mask)
-
+    # attention: [N, src_len/tgt_len, embed_size]
     x = self.dropout(self.norm1(attention + query))
+    # x: [N, src_len/tgt_len, embed_size]
     forward = self.feed_forward(x)
+    # forward: [N, src_len/tgt_len, embed_size]
     out = self.dropout(self.norm2(forward+x))
+    # out: [N, src_len/tgt_len, embed_size]
     return out
 
 class Encoder(nn.Module):
@@ -219,6 +233,10 @@ class Encoder(nn.Module):
     self.dropout = nn.Dropout(dropout)
 
   def forward(self, x, mask):
+
+    # x: [N, src_len]
+    # mask: [N, 1, 1, src_len]
+    
     N, seq_length = x.shape
     # here, just a naive implementation for position embedding
     # create [0, ... , seq_length] x N, then look up in the self.position_embedding
@@ -226,6 +244,7 @@ class Encoder(nn.Module):
     # As the position_embedding.weight requires_grad == True (by default)
     # it will be updated along with the training process
     positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
+    # positions: [N, src_len]
 
     # in original paper, using $PE_{(pos, 2i+1)} = cos(pos/10000^(2i/d_model))$
     # https://towardsdatascience.com/how-to-code-the-transformer-in-pytorch-24db27c8f9ec
@@ -240,9 +259,10 @@ class Encoder(nn.Module):
     # x = x * math.sqrt(self.d_model)
 
     out = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
+    # out: [N, src_len, embed_size])
     for layer in self.layers:
       out = layer(out, out, out, mask)
-
+    # out: [N, src_len, embed_size])
     return out
 
 class DecoderBlock(nn.Module):
@@ -263,9 +283,13 @@ class DecoderBlock(nn.Module):
     self.dropout = nn.Dropout(dropout)
   
   def forward(self, x, value ,key, src_mask, tgt_mask):
+    # x: [N, tgt_len, embed_size]), src_mask: [N, 1, 1, src_len]
+    # value, key: [N, src_len, embed_size]
+    # tgt_mask: [N, 1, tgt_len, tgt_len]
     attention = self.attention(x, x, x, tgt_mask)
     query = self.dropout(self.norm(attention +x))
     out = self.transformer_block(value, key, query, src_mask)
+    # attention, query, out: [N, tgt_len, embed_size]
     return out
 
 class Decoder(nn.Module):
@@ -296,12 +320,16 @@ class Decoder(nn.Module):
   def forward(self, x, enc_out, src_mask, tgt_mask):
     N, seq_length = x.shape
     positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
+    # positions: [N, tgt_len]
     x = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
+    # x: [N, tgt_len, embed_size]
 
     for layer in self.layers:
       x = layer(x, enc_out, enc_out, src_mask, tgt_mask)
+      # x: [N, tgt_len, embed_size]
     
     out = self.fc_out(x)
+    # out: [N, tgt_len, tgt_vocab_size]
 
     return out
 
@@ -372,11 +400,15 @@ class Transformer(nn.Module):
     return tgt_mask.to(self.device)
 
   def forward(self, src, tgt):
+    # src: [N, src_len], target: [N, tgt_len]
     src_mask = self.make_src_mask(src)
     tgt_mask = self.make_tgt_mask(tgt)
+    # src_mask [2, 1, 1, src_len], tgt_mask: [N, 1, tgt_len, tgt_len]
 
     enc_src = self.encoder(src, src_mask)
     out = self.decoder(tgt, enc_src, src_mask, tgt_mask)
+    # enc_src: [N, src_len, embed_size]
+    # out: [N, tgt_len, tgt_vocab_size]
 
     return out
 
