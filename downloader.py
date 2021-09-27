@@ -80,41 +80,60 @@ if __name__ == "__main__":
     import os
     from dialog import Dialog
     # pip3 install pythondialog
-    if len(sys.argv) == 2:
+    if len(sys.argv) >= 2:
         m3u8 = sys.argv[1]
-        Downloader(m3u8, nThread=25).download()
+        nThread = 25
+        if len(sys.argv) == 3:
+            try:
+                nThread = int(sys.argv[2])
+            except:
+                pass
+        Downloader(m3u8, nThread=nThread).download()
     else:
         locale.setlocale(locale.LC_ALL, '') 
         d = Dialog(dialog="dialog") 
         d.set_background_title("Downloader")
 
-        def input_dialog(title):
-            res = d.inputbox(title, 7, 40)
+        def input_dialog(title, init=""):
+            res = d.inputbox(title, 7, 40, init)
             if res[0] == 'ok':
                 return res[1]
             return None
 
-        m3u8 = input_dialog("Input m3u8 url:")
-        dirName =  input_dialog("Input dirname:")
+
+        d.msgbox(
+'''Downloader 1.0
+
+Freeware, Copyright © 2021
+HU YINGHAO
+hyinghao@hotmail.com
+All Rights Reserved
+
+''',11)
+        m3u8 =    input_dialog("Input m3u8 url:")
+        dirName = input_dialog("Input dirname:")
+        nThread = input_dialog("Input number of threads:", '25')
 
         script = '''#!/bin/bash
 
 V_NAME=%s
 M3U8_URL=%s
+N_THREAD=%s
 
 mkdir $V_NAME
 cp downloader.py $V_NAME
 cd $V_NAME
-python3.9 downloader.py ${M3U8_URL}
+python3 downloader.py ${M3U8_URL} ${N_THREAD} 2>&1
 cd ..
-ffmpeg -y -threads 0 -i ${V_NAME}.ts -vf scale=720:406 ${V_NAME}.mp4
+ffmpeg -y -threads 0 -i ${V_NAME}.ts -vf scale=720:406 ${V_NAME}.mp4 
 rm -Rf ${V_NAME}
 rm  ${V_NAME}.ts
-''' % (dirName, m3u8)
+''' % (dirName, m3u8, nThread)
         d.msgbox(script,20,60)
 
         with open("run.sh", "w") as f:
             f.write(script)
         os.system("chmod 777 *.sh")
+        os.system("nohup ./run.sh &")
+        d.tailbox("nohup.out")
         os.system("clear")
-        os.system("./run.sh")
