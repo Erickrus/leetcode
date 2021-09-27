@@ -1,3 +1,4 @@
+#!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 import sys
 import glob
@@ -75,5 +76,45 @@ class Downloader:
 
 
 if __name__ == "__main__":
-    m3u8 = sys.argv[1]
-    Downloader(m3u8, nThread=10).download()
+    import locale
+    import os
+    from dialog import Dialog
+    # pip3 install pythondialog
+    if len(sys.argv) == 2:
+        m3u8 = sys.argv[1]
+        Downloader(m3u8, nThread=25).download()
+    else:
+        locale.setlocale(locale.LC_ALL, '') 
+        d = Dialog(dialog="dialog") 
+        d.set_background_title("Downloader")
+
+        def input_dialog(title):
+            res = d.inputbox(title, 7, 40)
+            if res[0] == 'ok':
+                return res[1]
+            return None
+
+        m3u8 = input_dialog("Input m3u8 url:")
+        dirName =  input_dialog("Input dirname:")
+
+        script = '''#!/bin/bash
+
+V_NAME=%s
+M3U8_URL=%s
+
+mkdir $V_NAME
+cp downloader.py $V_NAME
+cd $V_NAME
+python3.9 downloader.py ${M3U8_URL}
+cd ..
+ffmpeg -y -threads 0 -i ${V_NAME}.ts -vf scale=720:406 ${V_NAME}.mp4
+rm -Rf ${V_NAME}
+rm  ${V_NAME}.ts
+''' % (dirName, m3u8)
+        d.msgbox(script,20,60)
+
+        with open("run.sh", "w") as f:
+            f.write(script)
+        os.system("chmod 777 *.sh")
+        os.system("clear")
+        os.system("./run.sh")
